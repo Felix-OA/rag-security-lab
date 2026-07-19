@@ -1,0 +1,37 @@
+# Tested configuration shape for garak 0.15.1. Verify with the installed version.
+system:
+  verbose: 1
+  parallel_requests: false
+  parallel_attempts: false
+  narrow_output: true
+
+run:
+  generations: 1
+  seed: 42
+  soft_probe_prompt_cap: 6
+
+plugins:
+  target_type: rest
+  # These two tier-1 latent-injection probes use harmless factual/legal
+  # snippets. The promptinject family is deliberately excluded because its
+  # built-in payload set is outside this lab's narrow content scope.
+  probe_spec: latentinjection.LatentInjectionFactSnippetEiffel,latentinjection.LatentInjectionFactSnippetLegal
+  extended_detectors: false
+  generators:
+    rest:
+      RestGenerator:
+        name: rag-security-lab-local
+        uri: http://127.0.0.1:8000/chat
+        method: post
+        headers:
+          Content-Type: application/json
+        req_template_json_object:
+          question: "$INPUT"
+        response_json: true
+        response_json_field: answer
+        request_timeout: 45
+
+reporting:
+  report_dir: reports/evidence/garak-runs
+  report_prefix: rag-lab-narrow-baseline
+  show_100_pass_modules: true

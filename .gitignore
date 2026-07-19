@@ -1,0 +1,16 @@
+.env
+.venv/
+.venv-*/
+.tool-state/
+.rag_index/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+redteam/garak/garak_config.yaml
+reports/evidence/**/*.jsonl
+reports/evidence/garak-runs/
+reports/evidence/pyrit-runs/
+*.log
+.DS_Store

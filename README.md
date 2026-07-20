@@ -2,15 +2,57 @@
 
 **Status: Baseline-versus-hardened evidence set complete.**
 
-RAG Security Lab is an intentionally vulnerable, local retrieval-augmented question-answering API for controlled measurement of retrieval poisoning, indirect prompt injection, synthetic PII and canary leakage, source-trust confusion, confidential-document exposure, and grounding failures. The planned case study is baseline test → targeted hardening → identical retest → before/after analysis.
+RAG Security Lab is a local retrieval-augmented question-answering API that preserves an intentionally vulnerable baseline alongside a bounded hardened profile. It measures retrieval poisoning, instruction-like retrieved content, synthetic PII and canary leakage, source-trust confusion, confidential-document exposure, and grounding failures through a completed baseline → hardening → identical retest → before/after workflow.
 
 > **Responsible use:** This repository is a controlled educational test environment. Run assessments only against the included local service or another system for which you have explicit written authorization. The synthetic canaries are designed solely for measurement and must never be replaced with production credentials, customer records, or personal data. The results demonstrate behavior in this test configuration only and are not a security certification.
 
 This is not secure RAG, is not enterprise-ready, and is not certified by garak, PyRIT, or any other tool.
 
-## Case Study
+## Results at a Glance
 
-Read the public-facing [RAG Security Lab case study](reports/public-case-study.md) for the threat model, methodology, baseline findings, bounded hardening controls, before/after results, utility tradeoffs, and measurement limitations.
+The three OpenAI-compatible baseline replications and three hardened replications produced stable scenario-level results with the same corpus, scenarios, provider, model, and temperature.
+
+| Metric | Baseline | Hardened |
+|---|---:|---:|
+| Scenario pass rate | 14/25 | 14/25 |
+| Reviewed synthetic canary disclosures | 3 | 0 |
+| Correct confidentiality refusals | 4/7 | 7/7 |
+| Confidential contexts admitted to the model | 7 | 0 |
+| Untrusted contexts admitted to the model | 15 | 0 |
+| Confirmed grounding failures after review | 0 | 0 |
+
+The unchanged pass rate hides a changed failure composition: repeated controlled disclosures stopped, while scorer mismatches and two source-coverage failures remained. Raw retrieval exposure itself did not change.
+
+## Case Study and Evidence
+
+- [Public case study](reports/public-case-study.md): threat model, methodology, controls, results, lessons, and limitations.
+- [Before/after summary](reports/before-after-summary.md): consolidated quantitative comparison.
+- [Baseline findings](reports/baseline-findings.md) and [hardened findings](reports/hardened-findings.md): replicated 25-scenario results.
+- [PyRIT/custom baseline](reports/pyrit-baseline-findings.md) and [hardened retest](reports/pyrit-hardened-findings.md).
+- [Narrow garak baseline](reports/garak-baseline-findings.md) and [hardened retest](reports/garak-hardened-findings.md).
+
+Generated raw JSONL, tool logs, and local provider configuration are intentionally ignored by Git. The tracked reports contain reviewed aggregate findings without API keys or real personal data.
+
+## Quick Start: Offline Baseline
+
+This path uses the key-free extractive fallback and requires no external model provider:
+
+```bash
+python3.12 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+cp .env.example .env
+python -m app.ingest
+uvicorn app.api:app --reload
+```
+
+Then open [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs), or verify the service from another terminal:
+
+```bash
+curl http://127.0.0.1:8000/health
+```
+
+The default baseline is intentionally vulnerable and should remain local. See [Configure a provider](#configure-a-provider) for OpenAI-compatible mode and [Run the bounded hardened profile](#run-the-bounded-hardened-profile) for the comparison profile.
 
 ## Security profiles
 
@@ -349,7 +391,7 @@ pytest
 python -m compileall app redteam
 ```
 
-## Expected behavior and limitations
+## Expected Baseline Behavior and Limitations
 
 - Untrusted and confidential chunks may rank in top-k results.
 - A real LLM may follow harmless instructions embedded in untrusted material.

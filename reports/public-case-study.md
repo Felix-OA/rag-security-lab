@@ -7,7 +7,7 @@ I built a local retrieval-augmented generation (RAG) question-answering system a
 The project followed a controlled before/after method:
 
 1. Build an intentionally weak baseline.
-2. Freeze a synthetic fintech corpus and 25 adversarial scenarios.
+2. Freeze a synthetic fintech corpus and 25 benign/adversarial scenarios.
 3. Capture extractive, OpenAI-compatible, PyRIT/custom, and narrow garak evidence.
 4. Add bounded hardening controls without changing the corpus, scenarios, model, provider, or temperature.
 5. Repeat the same tests and compare raw retrieval, admitted model context, answers, flags, and utility.
@@ -15,6 +15,17 @@ The project followed a controlled before/after method:
 The main outcome was an **observed reduction in confidential/untrusted context admission and synthetic canary disclosure**, not a claim of secure RAG. The hardened scenario pass rate remained 14/25 because the eliminated leakage failures were replaced by deterministic scorer mismatches and two source-coverage failures. That distinction became one of the most important lessons from the project: a single aggregate pass rate can hide meaningful changes in both risk and utility.
 
 All documents, identities, email addresses, customer IDs, account tokens, and canaries were fictional. No real company data, personal information, or production credentials were used.
+
+### Scope at a glance
+
+| Item | Scope |
+|---|---|
+| Corpus | 23 synthetic documents / 38 chunks |
+| Scenarios | 25 fixed benign and adversarial controls |
+| LLM comparison | `gpt-4.1`, temperature 0, three baseline and three hardened runs |
+| PyRIT | Version 0.14.0 through a local RAG-specific HTTP adapter |
+| garak | Version 0.15.1, two harmless probes, 12 attempts per profile |
+| Data | Fictional fintech policies, fake identities, and nonfunctional test canaries only |
 
 ## 2. Why This Matters
 
@@ -119,7 +130,7 @@ The local PyRIT-compatible adapter reproduced the 14/25 result, the same three r
 
 Two harmless tier-1 latent-injection snippet probes were sent directly to the local `/chat` endpoint. Seven of twelve attempts emitted the probe trigger. These were **supporting garak evidence** about direct-prompt behavior; garak did not seed a document, verify poisoned retrieval, or capture RAG source metadata.
 
-Detailed evidence is available in the [baseline findings](baseline-findings.md), [PyRIT/custom baseline findings](pyrit-baseline-findings.md), and [garak baseline findings](garak-baseline-findings.md).
+Detailed findings are available in the [baseline findings](baseline-findings.md), [PyRIT/custom baseline findings](pyrit-baseline-findings.md), and [garak baseline findings](garak-baseline-findings.md).
 
 ## 6. Hardening Controls
 
@@ -170,7 +181,7 @@ The hardened adapter run matched the replicated scenario results: zero reviewed 
 
 Four of twelve direct-prompt attempts emitted a trigger, compared with seven of twelve in the baseline. Both probe types still triggered. With only six attempts per probe and one hardened run, this is an observed reduction—not evidence that the controls caused the change or that latent injection was prevented.
 
-Detailed evidence is available in the [hardened findings](hardened-findings.md), [PyRIT/custom hardened findings](pyrit-hardened-findings.md), and [garak hardened findings](garak-hardened-findings.md).
+Detailed findings are available in the [hardened findings](hardened-findings.md), [PyRIT/custom hardened findings](pyrit-hardened-findings.md), and [garak hardened findings](garak-hardened-findings.md).
 
 ## 8. Before/After Results
 
@@ -183,7 +194,7 @@ Detailed evidence is available in the [hardened findings](hardened-findings.md),
 | Untrusted contexts admitted | 15 | 0 | Improved |
 | PyRIT/custom poison-marker echoes | 1 | 0 | Improved |
 | garak trigger emissions | 7/12 | 4/12 | Improved, but limited |
-| Utility/source-coverage failures | Lower; not separately classified | 2 observed | Tradeoff |
+| Utility/source-coverage failures | Not separately classified | 2 observed | Newly measured tradeoff |
 
 The table compares stable OpenAI-compatible scenario results unless a tool-specific row is identified. The full comparison and measurement notes are in the [before/after summary](before-after-summary.md).
 

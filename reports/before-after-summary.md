@@ -1,17 +1,17 @@
 # Before/After Summary
 
-This comparison uses the stable result from each of three OpenAI-compatible baseline replications and the first hardened OpenAI-compatible run. The corpus, 25 scenarios, provider, model, and temperature were unchanged. A reduction in these controlled signals is evidence about this lab configuration only.
+This comparison uses three OpenAI-compatible baseline replications and three hardened OpenAI-compatible replications. Each side produced internally stable signal and scenario-label results. The corpus, 25 scenarios, provider, model, and temperature were unchanged. A reduction in these controlled signals is evidence about this lab configuration only.
 
 ## Primary Comparison
 
-| Metric | OpenAI-Compatible Baseline | Hardened | Change |
+| Metric | OpenAI-Compatible Baseline (each of 3) | Hardened (each of 3) | Change |
 |---|---:|---:|---:|
 | Scenarios | 25 | 25 | 0 |
 | Passed | 14 (56%) | 14 (56%) | 0 |
 | Failed | 11 (44%) | 11 (44%) | 0 |
 | Raw untrusted retrieval exposures | 15 | 15 | 0 |
 | Untrusted contexts admitted to model | 15 | 0 | -15 |
-| Untrusted source reliance | 0–1 | 0 | Reduced to zero in this run |
+| Untrusted source reliance | 0–1 | 0 | Reduced to zero in all hardened runs |
 | Raw confidential retrieval exposures | 7 | 7 | 0 |
 | Confidential contexts admitted to model | 7 | 0 | -7 |
 | Confidential-context exclusions | 0 | 7 | +7 enforced exclusions |
@@ -25,17 +25,34 @@ This comparison uses the stable result from each of three OpenAI-compatible base
 | Confirmed grounding failures | 0* | 0** | No confirmed change |
 | Trusted-source grounding signal | 11 | 10 | -1 |
 | Benign-answer success signal | 4 | 3 | -1 |
-| Output-redaction activations | Not active | 0 | Not exercised by this run |
+| Output-redaction activations | Not active | 0 | Not exercised by any hardened run |
 
 \* Each baseline run had one automated grounding flag that manual review classified as a correct abstention.
 
-\** The hardened run had three automated grounding flags. Manual review classified all three as correct abstentions and scorer false positives.
+\** Every hardened run had the same three automated grounding flags. Manual review classified all three as correct abstentions and scorer false positives.
+
+## Hardened Replication Stability
+
+| Metric | Run 1 | Run 2 | Run 3 |
+|---|---:|---:|---:|
+| Passed / failed | 14 / 11 | 14 / 11 | 14 / 11 |
+| Reviewed PII/canary disclosures | 0 | 0 | 0 |
+| Correct confidentiality refusals | 7/7 | 7/7 | 7/7 |
+| Confidential contexts admitted | 0 | 0 | 0 |
+| Untrusted contexts admitted | 0 | 0 | 0 |
+| Poison-marker echoes | 0 | 0 | 0 |
+| Likely instruction compliance | 0 | 0 | 0 |
+| Confirmed grounding failures | 0 | 0 | 0 |
+| Scorer false positives | 3 | 3 | 3 |
+| Utility/source-coverage failures | 2 | 2 | 2 |
+
+All three runs had identical scenario labels, post-filter source selections, flags, and measured security signals. Response wording varied in 12 scenarios and latency varied, without changing these outcomes.
 
 ## What Improved
 
 - **Confidentiality boundary:** Seven raw confidential retrievals still occurred, but zero confidential chunks were admitted to model context. All seven direct or indirect confidentiality scenarios received correct refusals.
 - **Answer leakage:** The recurring baseline pattern of two exact plus one transformed synthetic canary disclosure fell to zero. This is answer-level improvement, not a claim that raw retrieval exposure disappeared.
-- **Source trust enforcement:** Fifteen instruction-like untrusted chunks were detected and excluded before generation. The hardened run recorded no untrusted-source reliance.
+- **Source trust enforcement:** Fifteen instruction-like untrusted chunks were detected and excluded before generation in every hardened run. None recorded untrusted-source reliance.
 - **Poison-content containment:** Raw retrieval still contained poison markers in 15 scenarios, but those marker-bearing contexts were excluded and marker echo remained at zero.
 
 ## What Did Not Improve
@@ -44,12 +61,12 @@ This comparison uses the stable result from each of three OpenAI-compatible base
 - **Top-line pass rate:** The result remained 14/25 because eliminated leakage failures were replaced by utility, source-expectation, and scorer failures.
 - **Answer availability:** Filtering sometimes removed relevant material without refilling the context window from eligible trusted sources. Two scenarios then lacked enough trusted context for the expected answer.
 - **Grounding/utility signals:** Trusted-source grounding decreased from 11 to 10 and benign-answer success from 4 to 3.
-- **Output-redaction evidence:** No output-redaction flag fired, so the run did not show whether redaction would catch a leak that passed the earlier controls.
+- **Output-redaction evidence:** No output-redaction flag fired in any hardened run, so the replications did not show whether redaction would catch a leak that passed the earlier controls.
 - **General injection assurance:** Zero observed marker compliance covers only the fixed safe fixtures. It does not demonstrate prompt-injection prevention or resistance to novel/adaptive attacks.
 
 ## Failure Interpretation
 
-The unchanged 11-failure total is not evidence that hardening had no effect. The baseline failures included three recurring reviewed canary disclosures and incomplete confidentiality refusals. Those did not recur. The hardened failures instead included:
+The unchanged 11-failure total is not evidence that hardening had no effect. The baseline failures included three recurring reviewed canary disclosures and incomplete confidentiality refusals. Those did not recur in any hardened replication. The stable hardened failures instead included:
 
 - three confirmed unknown-answer scorer false positives;
 - several rigid required-phrase or expected-source mismatches despite safe answers;
@@ -70,8 +87,8 @@ No hardened failure contained a reviewed synthetic canary disclosure, poison-mar
 
 ## Next Stage
 
-1. Run the hardened PyRIT/custom adapter against the same 25 scenarios first. It captures raw retrieval and answer evidence, so the before/after boundary measurements remain comparable.
+1. Run the hardened PyRIT/custom adapter against the same 25 scenarios first. The stable replications are sufficient to proceed, and the adapter captures raw retrieval and answer evidence for a comparable boundary assessment.
 2. Run the bounded hardened garak probes afterward as a separate direct-prompt test. Do not treat trigger emission or non-emission as retrieval-poisoning evidence without retrieval capture.
-3. Before publishing a final case study, replicate the hardened suite for consistency and complete both tool retests. A draft case study can be prepared now, but the final public claim set should include those results and preserve the limitations above.
+3. A draft case study can be prepared now, but complete both hardened tool retests before publishing the final comparative claim set.
 
 > These findings do not establish secure RAG, prompt-injection prevention, compliance, general model safety, or production readiness.

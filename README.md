@@ -1,12 +1,16 @@
 # RAG Security Lab
 
-**Status: Bounded hardening implementation phase.**
+**Status: Baseline-versus-hardened evidence set complete.**
 
 RAG Security Lab is an intentionally vulnerable, local retrieval-augmented question-answering API for controlled measurement of retrieval poisoning, indirect prompt injection, synthetic PII and canary leakage, source-trust confusion, confidential-document exposure, and grounding failures. The planned case study is baseline test → targeted hardening → identical retest → before/after analysis.
 
 > **Responsible use:** This repository is a controlled educational test environment. Run assessments only against the included local service or another system for which you have explicit written authorization. The synthetic canaries are designed solely for measurement and must never be replaced with production credentials, customer records, or personal data. The results demonstrate behavior in this test configuration only and are not a security certification.
 
 This is not secure RAG, is not enterprise-ready, and is not certified by garak, PyRIT, or any other tool.
+
+## Case Study
+
+Read the public-facing [RAG Security Lab case study](reports/public-case-study.md) for the threat model, methodology, baseline findings, bounded hardening controls, before/after results, utility tradeoffs, and measurement limitations.
 
 ## Security profiles
 

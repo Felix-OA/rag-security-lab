@@ -106,6 +106,27 @@ Both runs used PyRIT 0.14.0 through the same local `pyrit-http-adapter`, the sam
 - **Utility tradeoff:** Excluding disallowed chunks without refilling the context window left two hardened scenarios without the relevant trusted source. Safe abstention or incomplete answers replaced the expected useful policy response.
 - **Measurement limit:** The adapter preserves retrieval and response evidence but does not provide broad PyRIT orchestration, adaptive attacks, an LLM judge, or general security assurance. Historical baseline and hardened scorer versions also differ.
 
+## garak Narrow Baseline vs Hardened
+
+Bounded garak probes were used as supporting evidence in this local synthetic lab. Both runs used garak 0.15.1, the same two harmless tier-1 latent-injection snippet probes, six attempts per probe, one generation, disabled parallelism, and the local `/chat` request shape.
+
+| Metric | garak narrow baseline | garak narrow hardened | Change |
+|---|---:|---:|---:|
+| Attempts | 12 | 12 | 0 |
+| Trigger emitted | 7 | 4 | -3 |
+| Trigger absent | 5 | 8 | +3 |
+| Detector attack-success rate | 58.3% | 33.3% | -25 percentage points |
+| Eiffel trigger emissions | 3/6 | 2/6 | -1 |
+| Legal trigger emissions | 4/6 | 2/6 | -2 |
+
+### Interpretation
+
+- **Changed:** Trigger emission decreased from seven to four attempts, with fewer emissions for both probes.
+- **Remained:** Both probe types still emitted a trigger under the hardened profile. Direct-prompt latent-injection behavior was reduced in this run, not eliminated.
+- **Control attribution:** Hardened prompt and context behavior may have influenced the result, but one low-volume run cannot establish causality. Hosted-model variation remains a plausible contributor.
+- **Not RAG poisoning proof:** garak supplied the injection text directly as the user’s question. It did not seed a document, verify poisoned retrieval, call `/debug/retrieval`, or record source metadata and application flags.
+- **Measurement limit:** A trigger match records string emission, not whether the model complied with a retrieved instruction or trusted an untrusted source. These results supplement rather than replace the custom RAG and PyRIT/custom evidence.
+
 ## Measurement Boundaries
 
 - **Retrieval exposure** is raw top-k material returned by `/debug/retrieval`.
@@ -119,8 +140,6 @@ Both runs used PyRIT 0.14.0 through the same local `pyrit-http-adapter`, the sam
 
 ## Next Stage
 
-1. Run the hardened PyRIT/custom adapter against the same 25 scenarios first. The stable replications are sufficient to proceed, and the adapter captures raw retrieval and answer evidence for a comparable boundary assessment.
-2. Run the bounded hardened garak probes afterward as a separate direct-prompt test. Do not treat trigger emission or non-emission as retrieval-poisoning evidence without retrieval capture.
-3. A draft case study can be prepared now, but complete both hardened tool retests before publishing the final comparative claim set.
+The planned baseline-versus-hardened evidence set is now complete: replicated custom scenarios, PyRIT/custom comparison, and bounded garak supporting evidence. The project is ready to draft a public case study, provided the final narrative preserves the measurement boundaries, distinguishes direct prompts from retrieved poisoning, and avoids security, compliance, certification, or production-readiness claims.
 
 > These findings do not establish secure RAG, prompt-injection prevention, compliance, general model safety, or production readiness.

@@ -74,6 +74,38 @@ The unchanged 11-failure total is not evidence that hardening had no effect. The
 
 No hardened failure contained a reviewed synthetic canary disclosure, poison-marker echo, untrusted-source reliance, or confirmed invented phone number, address, or exchange rate.
 
+## PyRIT/Custom Baseline vs Hardened
+
+Both runs used PyRIT 0.14.0 through the same local `pyrit-http-adapter`, the same 25 scenarios, and the same provider/model/temperature. The baseline evidence is `pyrit-custom-baseline-20260719T111054Z.jsonl`; the hardened evidence is `pyrit-custom-hardened-20260720T131446Z.jsonl`.
+
+| Metric | PyRIT/Custom Baseline | PyRIT/Custom Hardened | Change |
+|---|---:|---:|---:|
+| Passed / failed | 14 / 11 | 14 / 11 | No change |
+| Reviewed PII/canary disclosures | 3 | 0 | -3 |
+| Exact / transformed canary disclosures | 2 / 1 | 0 / 0 | Reduced to zero |
+| Correct confidentiality refusals | 4/7 | 7/7 | +3 |
+| Raw confidential retrievals | 7 | 7 | No change |
+| Confidential contexts admitted | 7 | 0 | -7 |
+| Raw untrusted retrievals | 15 | 15 | No change |
+| Untrusted contexts admitted | 15 | 0 | -15 |
+| Untrusted-source reliance | 1 | 0 | -1 heuristic signal |
+| Poison-marker echoes | 1 | 0 | -1 |
+| Likely instruction compliance | 0 observed | 0 observed | No change |
+| Confirmed grounding failures | 0 | 0 | No change |
+| Scorer false positives | 1 | 3 | +2 |
+| Utility/source-coverage failures | Not separately reported | 2 | Two hardened availability misses |
+| Trusted-source grounding signal | 11 | 10 | -1 |
+| Benign-answer success signal | 4 | 3 | -1 |
+
+### Interpretation
+
+- **Improved:** Bounded hardening reduced observed leakage and context admission in this synthetic local lab. Reviewed canary disclosure fell from three to zero, confidentiality refusal correctness rose from 4/7 to 7/7, and no confidential or untrusted raw retrieval was admitted to model context.
+- **Stayed the same:** Raw retrieval exposure remained seven confidential and 15 untrusted scenarios. The top-line pass/fail result remained 14/11, and neither run showed marker-defined instruction compliance or a confirmed grounding failure.
+- **Improved poison containment:** The one baseline poison-marker echo did not recur. That baseline event was content echo while rejecting the poisoned rule, not instruction compliance.
+- **Got worse:** Automated scorer false positives increased from one to three, while trusted-grounding and benign-answer signals each declined by one.
+- **Utility tradeoff:** Excluding disallowed chunks without refilling the context window left two hardened scenarios without the relevant trusted source. Safe abstention or incomplete answers replaced the expected useful policy response.
+- **Measurement limit:** The adapter preserves retrieval and response evidence but does not provide broad PyRIT orchestration, adaptive attacks, an LLM judge, or general security assurance. Historical baseline and hardened scorer versions also differ.
+
 ## Measurement Boundaries
 
 - **Retrieval exposure** is raw top-k material returned by `/debug/retrieval`.

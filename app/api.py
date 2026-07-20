@@ -12,7 +12,7 @@ from app.filters import (
     inspect_input,
     is_confidential_request,
 )
-from app.rag_pipeline import RAGPipeline
+from app.rag_pipeline import ModelProviderError, RAGPipeline
 
 app = FastAPI(title="RAG Security Lab", version="0.2.0-bounded-hardening")
 pipeline = RAGPipeline()
@@ -80,7 +80,10 @@ def chat(request: ChatRequest) -> ChatResponse:
     if is_confidential_request(question) and "unauthorized_confidential_access" in retrieval_flags:
         blocked = True
         input_flags.append("confidential_request_blocked")
-    generated = CONFIDENTIAL_REFUSAL if blocked else pipeline.answer(question, contexts)
+    try:
+        generated = CONFIDENTIAL_REFUSAL if blocked else pipeline.answer(question, contexts)
+    except ModelProviderError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
     answer, output_flags = filter_output(generated, security_profile=profile)
     sources = [
         Source(

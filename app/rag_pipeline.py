@@ -15,6 +15,10 @@ from app.config import Settings, settings
 from app.prompts import BASIC_RAG_SYSTEM_PROMPT, HARDENED_RAG_SYSTEM_PROMPT, build_user_prompt
 
 
+class ModelProviderError(RuntimeError):
+    """A secret-safe failure returned by the configured model provider."""
+
+
 class HashEmbedding:
     """Small deterministic bag-of-words embedding suitable only for this demo."""
 
@@ -142,8 +146,18 @@ class ModelClient:
             with urllib.request.urlopen(request, timeout=self.config.request_timeout) as response:
                 payload = json.loads(response.read().decode("utf-8"))
             return payload["choices"][0]["message"]["content"]
-        except (urllib.error.URLError, KeyError, IndexError, json.JSONDecodeError) as exc:
-            raise RuntimeError(f"OpenAI-compatible model request failed: {exc}") from exc
+        except urllib.error.HTTPError as exc:
+            if exc.code in {401, 403}:
+                detail = "provider authentication failed; verify OPENAI_API_KEY locally"
+            elif exc.code == 429:
+                detail = "provider rate or quota limit was reached"
+            else:
+                detail = f"provider returned HTTP {exc.code}"
+            raise ModelProviderError(f"OpenAI-compatible model request failed: {detail}") from exc
+        except urllib.error.URLError as exc:
+            raise ModelProviderError("OpenAI-compatible model request failed: provider is unreachable") from exc
+        except (KeyError, IndexError, TypeError, json.JSONDecodeError) as exc:
+            raise ModelProviderError("OpenAI-compatible model returned an invalid response") from exc
 
 
 class RAGPipeline:

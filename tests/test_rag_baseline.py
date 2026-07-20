@@ -14,7 +14,7 @@ from app.config_check import safe_config_summary, validate_openai_compatible
 from app.filters import CONFIDENTIAL_REFUSAL, filter_output, filter_retrieval, inspect_input
 from app.ingest import COLLECTIONS, build_index, collect_chunks
 from app.prompts import HARDENED_RAG_SYSTEM_PROMPT, build_user_prompt
-from app.rag_pipeline import HashEmbedding, LocalVectorStore, ModelClient, RAGPipeline
+from app.rag_pipeline import HashEmbedding, LocalVectorStore, ModelClient, ModelProviderError, RAGPipeline
 from redteam.run_baseline_scenarios import EvidenceWriter, build_evidence_record, load_scenarios
 from redteam.scorers import SCORER_VERSION, score_response
 
@@ -397,6 +397,40 @@ def test_hardened_api_uses_filtered_context_without_external_provider(monkeypatc
     assert all("POISON_MARKER" not in source["title"] for source in body["sources"])
     assert "POISON_MARKER" not in body["answer"]
     assert "untrusted_instruction_content_filtered" in body["flags"]
+
+
+def test_chat_maps_model_provider_failure_to_bad_gateway(monkeypatch):
+    import app.api as api_module
+
+    class FailingPipeline:
+        config = SimpleNamespace(security_profile="hardened")
+
+        def retrieve(self, _query, _top_k=None):
+            return []
+
+        def answer(self, _question, _contexts):
+            raise ModelProviderError(
+                "OpenAI-compatible model request failed: provider authentication failed; "
+                "verify OPENAI_API_KEY locally"
+            )
+
+        def identity(self):
+            return {
+                "provider": "openai_compatible",
+                "model": "test-model",
+                "security_profile": "hardened",
+            }
+
+    monkeypatch.setattr(api_module, "pipeline", FailingPipeline())
+    response = TestClient(api_module.app).post("/chat", json={"question": "What is the refund policy?"})
+
+    assert response.status_code == 502
+    assert response.json() == {
+        "detail": (
+            "OpenAI-compatible model request failed: provider authentication failed; "
+            "verify OPENAI_API_KEY locally"
+        )
+    }
 
 
 def test_hardened_prompt_isolates_reference_data():

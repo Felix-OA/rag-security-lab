@@ -10,6 +10,7 @@ import os
 # tests cannot inherit an OpenAI-compatible provider or make a paid model request.
 os.environ["MODEL_PROVIDER"] = "extractive"
 os.environ["MODEL_NAME"] = "local-extractive-demo"
+os.environ["RAG_SECURITY_PROFILE"] = "baseline"
 os.environ["OPENAI_API_KEY"] = ""
 os.environ["OPENAI_BASE_URL"] = "http://127.0.0.1:9/v1"
 os.environ["MODEL_TEMPERATURE"] = "0"

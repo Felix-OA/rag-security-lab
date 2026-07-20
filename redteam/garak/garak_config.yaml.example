@@ -32,6 +32,8 @@ plugins:
         request_timeout: 45
 
 reporting:
-  report_dir: reports/evidence/garak-runs
+  # Set XDG_DATA_HOME to reports/evidence/garak-runs when invoking garak.
+  # A local report_dir avoids repeating the project path inside garak output.
+  report_dir: .
   report_prefix: rag-lab-narrow-baseline
   show_100_pass_modules: true

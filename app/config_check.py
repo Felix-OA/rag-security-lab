@@ -18,6 +18,7 @@ def safe_config_summary(config: Settings) -> dict[str, Any]:
     key_present = bool(key_value) and "replace-with" not in key_value.lower()
     return {
         "provider": config.model_provider,
+        "security_profile": config.security_profile,
         "base_url_host": parsed.hostname or "invalid-or-missing",
         "model": config.model_name,
         "temperature": config.model_temperature,
@@ -51,10 +52,19 @@ def check_running_api(api_url: str, config: Settings) -> dict[str, str]:
             payload = json.loads(response.read().decode("utf-8"))
     except (urllib.error.URLError, json.JSONDecodeError) as exc:
         raise RuntimeError(f"Could not validate the running local API: {exc}") from exc
-    identity = {"provider": str(payload.get("provider", "unknown")), "model": str(payload.get("model", "unknown"))}
-    if identity != {"provider": config.model_provider, "model": config.model_name}:
+    identity = {
+        "provider": str(payload.get("provider", "unknown")),
+        "model": str(payload.get("model", "unknown")),
+        "security_profile": str(payload.get("security_profile", "unknown")),
+    }
+    expected = {
+        "provider": config.model_provider,
+        "model": config.model_name,
+        "security_profile": config.security_profile,
+    }
+    if identity != expected:
         raise RuntimeError(
-            "Running API identity does not match .env; restart uvicorn after changing provider configuration"
+            "Running API identity does not match .env; restart uvicorn after changing configuration"
         )
     return identity
 
@@ -62,11 +72,16 @@ def check_running_api(api_url: str, config: Settings) -> dict[str, str]:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--require-openai-compatible", action="store_true")
+    parser.add_argument("--require-security-profile", choices=("baseline", "hardened"))
     parser.add_argument("--api-url", help="Optionally verify provider/model through one local /chat request")
     args = parser.parse_args()
 
     if args.require_openai_compatible:
         validate_openai_compatible(settings)
+    if args.require_security_profile and settings.security_profile != args.require_security_profile:
+        raise ValueError(
+            f"RAG_SECURITY_PROFILE is {settings.security_profile!r}, expected {args.require_security_profile!r}"
+        )
     summary = safe_config_summary(settings)
     for key, value in summary.items():
         print(f"{key}: {str(value).lower() if isinstance(value, bool) else value}")
@@ -76,6 +91,7 @@ def main() -> None:
         identity = check_running_api(args.api_url, settings)
         print(f"running_api_provider: {identity['provider']}")
         print(f"running_api_model: {identity['model']}")
+        print(f"running_api_security_profile: {identity['security_profile']}")
         print("running_api_identity_matches_env: true")
 
 

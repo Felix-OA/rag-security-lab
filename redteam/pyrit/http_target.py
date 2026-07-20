@@ -20,6 +20,7 @@ class RAGLabTargetResult:
     flags: list[str]
     provider: str
     model: str
+    security_profile: str
     latency_ms: float
 
     def to_dict(self) -> dict[str, Any]:
@@ -66,5 +67,6 @@ class RAGLabHTTPAdapter:
             flags=payload.get("flags", []),
             provider=payload.get("provider", "unknown"),
             model=payload.get("model", "unknown"),
+            security_profile=payload.get("security_profile", "unknown"),
             latency_ms=latency_ms,
         )

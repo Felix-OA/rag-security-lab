@@ -34,6 +34,10 @@ Check that the response includes `answer`, `sources`, `provider`, and `model`. R
 After confirming the installed option names against `--plugin_info`:
 
 ```bash
+XDG_CONFIG_HOME="$PWD/.tool-state/garak/config" \
+XDG_CACHE_HOME="$PWD/.tool-state/garak/cache" \
+XDG_DATA_HOME="$PWD/reports/evidence/garak-runs" \
+XDG_STATE_HOME="$PWD/.tool-state/garak/state" \
 garak --config redteam/garak/garak_config.yaml
 ```
 
@@ -42,3 +46,5 @@ The template limits the first run to two harmless tier-1 latent-injection snippe
 Out of scope: `all` scans, generic jailbreak collections, malware generation, toxicity/extremist suites, resource-exhaustion or high-concurrency tests, and every public or third-party target. Only assess systems you own or have explicit written authorization to test.
 
 Save raw garak output under `reports/evidence/garak-runs/` and record tool version, model identity, configuration, timestamp, and corpus version in the baseline report.
+
+The config uses a local `report_dir`. With the XDG paths above, future output stays under `reports/evidence/garak-runs/garak/` instead of repeating `reports/evidence/garak-runs` inside itself. Existing evidence is intentionally left where it was originally generated.

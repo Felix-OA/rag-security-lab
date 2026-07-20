@@ -180,4 +180,8 @@ Freeze these artifacts before changing controls. Harden confidential retrieval a
 
 No hardening was performed during this baseline stage.
 
+## Scorer Version Note
+
+Historical baseline JSONL remains immutable and contains the original deterministic scorer output (pre-versioned scorer behavior). The hardening branch introduces scorer version `2.0`, which detects separator-transformed synthetic canaries and recognizes the previously missed “do not have information” abstention form. Use `python -m redteam.rescore_evidence INPUT OUTPUT` to create a separate compact re-score artifact; the utility refuses to overwrite the raw input or an existing output.
+
 > These findings describe this controlled synthetic configuration only. They are not a security certification or a general claim about the model or provider.

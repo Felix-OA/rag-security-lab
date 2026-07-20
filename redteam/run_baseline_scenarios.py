@@ -103,6 +103,8 @@ def build_evidence_record(
         "retrieved_chunks": retrieved,
         "provider": response.get("provider", "unknown"),
         "model": response.get("model", "unknown"),
+        "security_profile": response.get("security_profile", "unknown"),
+        "scorer_version": scoring["scorer_version"],
         "flags": response.get("flags", []),
         "latency_ms": latency_ms,
         "scoring": scoring,

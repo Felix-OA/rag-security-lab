@@ -11,8 +11,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-from app.config import settings
-from app.prompts import BASIC_RAG_SYSTEM_PROMPT, build_user_prompt
+from app.config import Settings, settings
+from app.prompts import BASIC_RAG_SYSTEM_PROMPT, HARDENED_RAG_SYSTEM_PROMPT, build_user_prompt
 
 
 class HashEmbedding:
@@ -102,41 +102,44 @@ class LocalVectorStore:
 
 
 class ModelClient:
+    def __init__(self, config: Settings | Any | None = None):
+        self.config = config or settings
+
     @property
     def provider(self) -> str:
-        return settings.model_provider
+        return self.config.model_provider
 
     @property
     def model(self) -> str:
-        return settings.model_name
+        return self.config.model_name
 
     def generate(self, system_prompt: str, user_prompt: str, contexts: list[dict]) -> str:
-        if settings.model_provider == "extractive":
+        if self.config.model_provider == "extractive":
             if not contexts:
                 return "I do not know based on the retrieved context."
             # Intentionally weak: echoes the most relevant context without redaction.
             excerpt = contexts[0]["text"].replace("\n", " ")[:700]
             return f"Based on the retrieved context: {excerpt}"
-        if settings.model_provider != "openai_compatible":
+        if self.config.model_provider != "openai_compatible":
             raise ValueError("MODEL_PROVIDER must be 'extractive' or 'openai_compatible'")
         body = json.dumps(
             {
-                "model": settings.model_name,
+                "model": self.config.model_name,
                 "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
-                "temperature": settings.model_temperature,
+                "temperature": self.config.model_temperature,
             }
         ).encode("utf-8")
         headers = {"Content-Type": "application/json"}
-        if settings.api_key:
-            headers["Authorization"] = f"Bearer {settings.api_key}"
+        if self.config.api_key:
+            headers["Authorization"] = f"Bearer {self.config.api_key}"
         request = urllib.request.Request(
-            f"{settings.api_base_url.rstrip('/')}/chat/completions", data=body, headers=headers, method="POST"
+            f"{self.config.api_base_url.rstrip('/')}/chat/completions", data=body, headers=headers, method="POST"
         )
         try:
-            with urllib.request.urlopen(request, timeout=settings.request_timeout) as response:
+            with urllib.request.urlopen(request, timeout=self.config.request_timeout) as response:
                 payload = json.loads(response.read().decode("utf-8"))
             return payload["choices"][0]["message"]["content"]
         except (urllib.error.URLError, KeyError, IndexError, json.JSONDecodeError) as exc:
@@ -144,15 +147,29 @@ class ModelClient:
 
 
 class RAGPipeline:
-    def __init__(self, index_dir: Path | None = None):
-        self.store = LocalVectorStore(index_dir or settings.index_dir, HashEmbedding(settings.embedding_dimensions))
-        self.model = ModelClient()
+    def __init__(self, index_dir: Path | None = None, config: Settings | None = None):
+        self.config = config or settings
+        self.store = LocalVectorStore(
+            index_dir or self.config.index_dir,
+            HashEmbedding(self.config.embedding_dimensions),
+        )
+        self.model = ModelClient(self.config)
 
     def retrieve(self, query: str, top_k: int | None = None) -> list[dict]:
-        return self.store.search(query, top_k or settings.top_k)
+        return self.store.search(query, top_k or self.config.top_k)
 
     def answer(self, question: str, contexts: list[dict]) -> str:
-        return self.model.generate(BASIC_RAG_SYSTEM_PROMPT, build_user_prompt(question, contexts), contexts)
+        hardened = self.config.security_profile == "hardened"
+        system_prompt = HARDENED_RAG_SYSTEM_PROMPT if hardened else BASIC_RAG_SYSTEM_PROMPT
+        return self.model.generate(
+            system_prompt,
+            build_user_prompt(question, contexts, hardened=hardened),
+            contexts,
+        )
 
     def identity(self) -> dict[str, str]:
-        return {"provider": self.model.provider, "model": self.model.model}
+        return {
+            "provider": self.model.provider,
+            "model": self.model.model,
+            "security_profile": self.config.security_profile,
+        }

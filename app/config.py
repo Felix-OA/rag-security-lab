@@ -21,6 +21,7 @@ class Settings:
     chunk_size: int = int(os.getenv("RAG_CHUNK_SIZE", "800"))
     chunk_overlap: int = int(os.getenv("RAG_CHUNK_OVERLAP", "100"))
     embedding_dimensions: int = int(os.getenv("EMBEDDING_DIMENSIONS", "384"))
+    security_profile: str = os.getenv("RAG_SECURITY_PROFILE", "baseline").strip().lower()
     model_provider: str = os.getenv("MODEL_PROVIDER", "extractive")
     model_name: str = os.getenv("MODEL_NAME", "local-extractive-demo")
     api_base_url: str = os.getenv("OPENAI_BASE_URL", "http://localhost:11434/v1")
@@ -31,6 +32,8 @@ class Settings:
     def __post_init__(self) -> None:
         if self.model_provider not in {"extractive", "openai_compatible"}:
             raise ValueError("MODEL_PROVIDER must be 'extractive' or 'openai_compatible'")
+        if self.security_profile not in {"baseline", "hardened"}:
+            raise ValueError("RAG_SECURITY_PROFILE must be 'baseline' or 'hardened'")
         if self.top_k <= 0:
             raise ValueError("RAG_TOP_K must be positive")
         if self.chunk_size <= 0 or not 0 <= self.chunk_overlap < self.chunk_size:

@@ -23,10 +23,27 @@ def parse_document(path: Path, data_root: Path) -> dict:
     title_match = re.search(r"^#\s+(.+)$", text, flags=re.MULTILINE)
     title = title_match.group(1).strip() if title_match else path.stem.replace("_", " ").title()
     category = path.relative_to(data_root).parts[0]
+    classification_match = re.search(r"^Classification:\s*(.+)$", text, flags=re.MULTILINE | re.IGNORECASE)
+    allowed_role_match = re.search(r"^Allowed access role:\s*(.+)$", text, flags=re.MULTILINE | re.IGNORECASE)
+    default_classification = {
+        "clean_docs": "public policy",
+        "control_docs": "trusted control",
+        "poisoned_docs": "untrusted reference",
+        "synthetic_pii_docs": "confidential synthetic fixture",
+    }[category]
     return {
         "title": title,
         "path": str(path.relative_to(data_root.parent)),
         "trust_level": COLLECTIONS[category],
+        "classification": (
+            classification_match.group(1).strip() if classification_match else default_classification
+        ),
+        "allowed_roles": (
+            [role.strip() for role in allowed_role_match.group(1).split(",") if role.strip()]
+            if allowed_role_match
+            else []
+        ),
+        "source_type": category,
         "text": text,
     }
 
@@ -67,6 +84,9 @@ def collect_chunks(data_root: Path, chunk_size: int, chunk_overlap: int) -> list
                             "title": document["title"],
                             "path": document["path"],
                             "trust_level": trust_level,
+                            "classification": document["classification"],
+                            "allowed_roles": document["allowed_roles"],
+                            "source_type": document["source_type"],
                             "chunk_index": index,
                         },
                     }

@@ -28,19 +28,25 @@ def pyrit_version() -> str:
         return "adapter-only (PyRIT package not installed)"
 
 
-async def smoke_test(base_url: str) -> None:
+def _verify_profile(actual: str, required: str | None) -> None:
+    if required and actual != required:
+        raise RuntimeError(f"API security profile is {actual!r}, expected {required!r}")
+
+
+async def smoke_test(base_url: str, required_profile: str | None = None) -> None:
     suite = load_scenarios()
     scenario = suite["scenarios"][0]
     result = await RAGLabHTTPAdapter(base_url).send_prompt_async(
         scenario["user_question"], scenario["scenario_id"]
     )
+    _verify_profile(result.security_profile, required_profile)
     print(
         f"Smoke test received provider={result.provider}, model={result.model}, "
-        f"sources={len(result.sources)}, latency_ms={result.latency_ms}"
+        f"profile={result.security_profile}, sources={len(result.sources)}, latency_ms={result.latency_ms}"
     )
 
 
-async def run_suite(base_url: str, output: Path) -> list[dict]:
+async def run_suite(base_url: str, output: Path, required_profile: str | None = None) -> list[dict]:
     suite = load_scenarios()
     adapter = RAGLabHTTPAdapter(base_url)
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -48,6 +54,7 @@ async def run_suite(base_url: str, output: Path) -> list[dict]:
     with output.open("x", encoding="utf-8") as handle:
         for scenario in suite["scenarios"]:
             result = await adapter.send_prompt_async(scenario["user_question"], scenario["scenario_id"])
+            _verify_profile(result.security_profile, required_profile)
             response = {
                 "answer": result.answer,
                 "sources": result.sources,
@@ -68,6 +75,8 @@ async def run_suite(base_url: str, output: Path) -> list[dict]:
                 "retrieved_chunks": result.retrieved_chunks,
                 "provider": result.provider,
                 "model": result.model,
+                "security_profile": result.security_profile,
+                "scorer_version": scoring["scorer_version"],
                 "flags": result.flags,
                 "latency_ms": result.latency_ms,
                 "scoring": scoring,
@@ -88,6 +97,7 @@ def main() -> None:
     parser.add_argument("--run", action="store_true", help="Run all versioned custom RAG scenarios")
     parser.add_argument("--base-url", default="http://127.0.0.1:8000")
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--require-profile", choices=("baseline", "hardened"))
     args = parser.parse_args()
     suite = load_scenarios()
     print(
@@ -95,11 +105,11 @@ def main() -> None:
         f"{len(suite['scenarios'])} versioned synthetic scenarios."
     )
     if args.smoke:
-        asyncio.run(smoke_test(args.base_url))
+        asyncio.run(smoke_test(args.base_url, args.require_profile))
     elif args.run:
         stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
         output = args.output or DEFAULT_EVIDENCE_DIR / f"pyrit-custom-baseline-{stamp}.jsonl"
-        records = asyncio.run(run_suite(args.base_url, output))
+        records = asyncio.run(run_suite(args.base_url, output, args.require_profile))
         passed = sum(record["label"] == "pass" for record in records)
         print(f"Summary: {passed}/{len(records)} passed; evidence written to {output}")
     else:

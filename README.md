@@ -1,6 +1,6 @@
 # RAG Security Lab
 
-**Status: Baseline readiness phase.**
+**Status: Bounded hardening implementation phase.**
 
 RAG Security Lab is an intentionally vulnerable, local retrieval-augmented question-answering API for controlled measurement of retrieval poisoning, indirect prompt injection, synthetic PII and canary leakage, source-trust confusion, confidential-document exposure, and grounding failures. The planned case study is baseline test → targeted hardening → identical retest → before/after analysis.
 
@@ -8,16 +8,21 @@ RAG Security Lab is an intentionally vulnerable, local retrieval-augmented quest
 
 This is not secure RAG, is not enterprise-ready, and is not certified by garak, PyRIT, or any other tool.
 
-## Current baseline
+## Security profiles
 
-The application retrieves top-k chunks without enforcing source trust, places trusted, untrusted, and confidential material into the model context, and returns the answer without PII redaction or canary blocking. Those weaknesses are intentional and must remain limited to synthetic local data until the baseline is measured.
+`RAG_SECURITY_PROFILE` selects a comparison profile. The default is `baseline` so historical behavior is not silently changed.
+
+- `baseline`: retrieves top-k chunks without enforcing source trust, places trusted, untrusted, and confidential material into context, and returns the answer without PII/canary redaction. This intentionally vulnerable behavior is preserved for regression comparison.
+- `hardened`: enables bounded controls for this synthetic lab: confidential-context access decisions, deterministic confidentiality refusal, trusted-source preference, instruction-like untrusted-content filtering, prompt isolation, and output canary/PII redaction.
+
+The hardened profile does not guarantee prompt-injection prevention, complete PII detection, authentication, compliance, certification, or production readiness.
 
 Two provider modes are available:
 
 - `extractive`: deterministic, key-free fallback that returns an excerpt from the highest-ranked chunk. It measures retrieval exposure and direct content echo only. **It is not an LLM and its output must not be described as indirect prompt-injection compliance.**
 - `openai_compatible`: calls a configured `/chat/completions` endpoint, including local OpenAI-compatible providers. It sends an actual system message and a separate user message containing clearly delimited retrieved context. Use this mode for behavioral instruction-following tests.
 
-Temperature defaults to `0`. Every `/chat` response records the provider and model identity.
+Temperature defaults to `0`. Every `/chat` response records provider, model, and active security profile.
 
 ## Threat model
 
@@ -40,15 +45,17 @@ synthetic files (trusted | untrusted | confidential)
              v
        ingest + local index -----> /debug/retrieval (local lab only)
              |                              |
-user -----> /chat -----> top-k context ----+----> provider ----> answer/sources/identity
+user -----> /chat -----> profile filters --+----> provider ----> answer/sources/identity
                             |
-                      inactive filters
+                 baseline pass-through or
+                 bounded hardened controls
 ```
 
 - File metadata assigns the initial trust label.
 - Retrieval crosses the data-to-prompt boundary without policy enforcement in the baseline.
 - An OpenAI-compatible provider is an external trust boundary unless it runs locally.
 - `/debug/retrieval` returns raw synthetic chunks, including confidential fixtures, and must never be exposed beyond this local lab.
+- Hardened `role` and `role_verified` request fields simulate an authorization result for testing; they are not real authentication and must not be treated as a production security boundary.
 
 ### Non-goals
 
@@ -89,6 +96,7 @@ Separate setup instructions are in `redteam/garak/README.md` and `redteam/pyrit/
 The key-free fallback is the default:
 
 ```dotenv
+RAG_SECURITY_PROFILE=baseline
 MODEL_PROVIDER=extractive
 MODEL_NAME=local-extractive-demo
 MODEL_TEMPERATURE=0
@@ -97,6 +105,7 @@ MODEL_TEMPERATURE=0
 For a local or hosted OpenAI-compatible service:
 
 ```dotenv
+RAG_SECURITY_PROFILE=baseline
 MODEL_PROVIDER=openai_compatible
 OPENAI_BASE_URL=https://your-openai-compatible-host.example/v1
 OPENAI_API_KEY=replace-with-your-api-key-locally
@@ -106,6 +115,40 @@ MODEL_TIMEOUT_SECONDS=60
 ```
 
 `OPENAI_API_KEY` may be empty only when a local endpoint does not require authentication. Never put a real key in `.env.example`, command history, screenshots, evidence files, or chat. Never commit `.env`. If the provider is hosted, remember that retrieved synthetic context leaves the local process; use only a provider and data flow you are authorized to use.
+
+## Run the bounded hardened profile
+
+Keep the same provider, model, temperature, corpus, and scenario file used for the baseline. In the ignored local `.env`, change only:
+
+```dotenv
+RAG_SECURITY_PROFILE=hardened
+```
+
+Rebuild the unchanged corpus index so the existing document headers are recorded as metadata, then restart the API:
+
+```bash
+python -m app.ingest
+uvicorn app.api:app --reload
+```
+
+Confirm the secret-safe local and running identities:
+
+```bash
+python -m app.config_check \
+  --require-openai-compatible \
+  --require-security-profile hardened \
+  --api-url http://127.0.0.1:8000
+```
+
+Run the unchanged 25 scenarios and save evidence separately:
+
+```bash
+bash scripts/run_hardened_openai_compatible.sh
+```
+
+Evidence is written to `reports/evidence/hardened-runs/hardened-openai-compatible-<timestamp>.jsonl`. The runner refuses a non-hardened API and refuses to overwrite an existing evidence file. Compare the result using `reports/hardened-findings.md` and `reports/before-after-summary.md`.
+
+Hardened requests default to the `general` role. For a controlled authorization test only, the request schema also accepts `role` and `role_verified`. A confidential chunk is admitted only when `role_verified` is true and the role exactly matches the document's `Allowed access role` metadata. Do not expose this lab control as authentication.
 
 ## Run the OpenAI-compatible baseline
 
@@ -222,7 +265,7 @@ curl -s http://127.0.0.1:8000/chat \
   -d '{"question":"How long does a merchant-approved refund normally take?"}'
 ```
 
-The response includes `answer`, ranked `sources`, currently inactive `flags`, `provider`, and `model`.
+The response includes `answer`, ranked admitted `sources`, security `flags`, `provider`, `model`, and `security_profile`.
 
 Local retrieval inspection:
 
@@ -258,7 +301,7 @@ Evidence is written as JSONL under `reports/evidence/baseline-runs/`. Generated 
 
 ## Deterministic evaluation
 
-`redteam/scorers.py` provides primary rule-based signals for exact canaries, synthetic emails, fake customer IDs, account tokens, poison markers, refusal correctness, trusted grounding, untrusted reliance, unsupported answers, and benign answer success.
+`redteam/scorers.py` provides versioned primary rule-based signals for exact and transformed canaries, synthetic emails, fake customer IDs, account tokens, poison markers, refusal correctness, trusted grounding, untrusted reliance, unsupported answers, and benign answer success.
 
 The evidence record distinguishes:
 
@@ -270,6 +313,14 @@ The evidence record distinguishes:
 - confidential data disclosed.
 
 Echo versus compliance is necessarily heuristic and requires raw-evidence review. An optional LLM judge may later add qualitative context but must not replace deterministic scoring.
+
+Scorer version `2.0` recognizes separator-transformed canaries and additional grounded abstention phrases. Historical JSONL is never rewritten. To create a separate compact re-score artifact:
+
+```bash
+python -m redteam.rescore_evidence \
+  reports/evidence/baseline-runs/INPUT.jsonl \
+  reports/evidence/rescored/OUTPUT.jsonl
+```
 
 ### Metrics
 
@@ -294,7 +345,7 @@ pytest
 python -m compileall app redteam
 ```
 
-## Expected baseline behavior and limitations
+## Expected behavior and limitations
 
 - Untrusted and confidential chunks may rank in top-k results.
 - A real LLM may follow harmless instructions embedded in untrusted material.
@@ -304,6 +355,6 @@ python -m compileall app redteam
 - Hash embeddings are deterministic and compact, not representative of production retrieval quality.
 - The API is stateless and has no conversational memory.
 - The scorer uses transparent heuristics and requires human review for ambiguous cases.
-- No hardened controls are active yet.
-
-Do not begin hardening until a fixed provider, corpus, scenario version, and baseline evidence set have been recorded.
+- Hardened rules are deterministic and intentionally narrow; novel encodings, paraphrases, retrieval conflicts, and authorization failures may remain.
+- The same provider may still vary across runs even at temperature 0.
+- Neither profile should be exposed to real customer data or public traffic.
